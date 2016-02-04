@@ -110,6 +110,13 @@ angular.module("ngDraggable", [])
                 var allowTransform = angular.isDefined(attrs.allowTransform) ? scope.$eval(attrs.allowTransform) : true;
 
                 var getDragData = $parse(attrs.ngDragData);
+                var dragCloneData = {
+                  group : attrs.ngDragCloneGroup || null,
+                  copyHtml : (attrs.ngDragDCloneCopyHtml === "false" || attrs.ngDragDCloneCopyHtml === false)? false : true,
+                  copyClass : (attrs.ngDragCloneCopyClass === "false" || attrs.ngDragCloneCopyClass === false)? false : true,
+                  addClass : attrs.ngDragCloneAddClass || null,
+                  hideOnClone :attrs.ngDragCloneHide || true
+                };
 
                 // deregistration function for mouse move events in $rootScope triggered by jqLite trigger handler
                 var _deregisterRootMoveListener = angular.noop;
@@ -246,7 +253,7 @@ angular.module("ngDraggable", [])
                     if (!element.hasClass('dragging')) {
                         _data = getDragData(scope);
                         element.addClass('dragging');
-                        $rootScope.$broadcast('draggable:start', {x:_mx, y:_my, tx:_tx, ty:_ty, event:evt, element:element, data:_data});
+                        $rootScope.$broadcast('draggable:start', {x:_mx, y:_my, tx:_tx, ty:_ty, event:evt, element:element, data:_data, dragCloneData : dragCloneData});
 
                         if (onDragStartCallback ){
                             scope.$apply(function () {
@@ -268,14 +275,14 @@ angular.module("ngDraggable", [])
 
                     moveElement(_tx, _ty);
 
-                    $rootScope.$broadcast('draggable:move', { x: _mx, y: _my, tx: _tx, ty: _ty, event: evt, element: element, data: _data, uid: _myid, dragOffset: _dragOffset });
+                    $rootScope.$broadcast('draggable:move', { x: _mx, y: _my, tx: _tx, ty: _ty, event: evt, element: element, data: _data, uid: _myid, dragOffset: _dragOffset, dragCloneData : dragCloneData });
                 };
 
                 var onrelease = function(evt) {
                     if (!_dragEnabled)
                         return;
                     evt.preventDefault();
-                    $rootScope.$broadcast('draggable:end', {x:_mx, y:_my, tx:_tx, ty:_ty, event:evt, element:element, data:_data, callback:onDragComplete, uid: _myid});
+                    $rootScope.$broadcast('draggable:end', {x:_mx, y:_my, tx:_tx, ty:_ty, event:evt, element:element, data:_data, callback:onDragComplete, uid: _myid, dragCloneData : dragCloneData});
                     element.removeClass('dragging');
                     element.parent().find('.drag-enter').removeClass('drag-enter');
                     reset();
@@ -325,7 +332,7 @@ angular.module("ngDraggable", [])
         };
     }])
 
-    .directive('ngDrop', ['$parse', '$timeout', '$window', '$document', 'ngDraggable', 'ngDragHitTest', function ($parse, $timeout, $window, $document, ngDraggable, ngDragHitTest) {
+    .directive('ngDrop', ['$rootScope', '$parse', '$timeout', '$window', '$document', 'ngDraggable', 'ngDragHitTest', function ($rootScope, $parse, $timeout, $window, $document, ngDraggable, ngDragHitTest) {
         return {
             restrict: 'A',
             link: function (scope, element, attrs) {
@@ -418,7 +425,7 @@ angular.module("ngDraggable", [])
                 };
 
                 var isTouching = function(mouseX, mouseY, dragElement) {
-                    var touching= ngDragHitTest(element[0], mouseX, mouseY).inside;
+                    var touching= hitTest(mouseX, mouseY);
                     scope.isTouching = touching;
                     if(touching){
                         _lastDropTouch = element;
@@ -429,23 +436,25 @@ angular.module("ngDraggable", [])
 
                 var updateDragStyles = function(touching, dragElement) {
                     if(touching){
+                        var justEntered = !element.hasClass('drag-enter');
                         element.addClass('drag-enter');
                         dragElement.addClass('drag-over');
+                        if(justEntered)
+                        {
+                          $rootScope.$broadcast('droppable:dragenter', {element:element, dragElement:dragElement});
+                        }
                     }else if(_lastDropTouch == element){
                         _lastDropTouch=null;
+                        var justLeaved = element.hasClass('drag-enter');
                         element.removeClass('drag-enter');
                         dragElement.removeClass('drag-over');
+                        if(justLeaved)
+                          $rootScope.$broadcast('droppable:dragleave', {element:element, dragElement:dragElement});
                     }
                 };
 
-                var hitTest = function(x, y) {
-                    var bounds = element[0].getBoundingClientRect();// ngDraggable.getPrivOffset(element);
-                    x -= $document[0].body.scrollLeft + $document[0].documentElement.scrollLeft;
-                    y -= $document[0].body.scrollTop + $document[0].documentElement.scrollTop;
-                    return  x >= bounds.left
-                        && x <= bounds.right
-                        && y <= bounds.bottom
-                        && y >= bounds.top;
+                var hitTest = function(mouseX, mouseY) {
+                    return ngDragHitTest(element[0], mouseX, mouseY).inside;
                 };
 
                 initialize();
@@ -459,8 +468,21 @@ angular.module("ngDraggable", [])
                 var img, _allowClone=true;
                 var _dragOffset = null;
                 scope.clonedData = {};
-                var initialize = function () {
 
+                var _baseHTML = "";
+                var _baseClass = "";
+                var _group = attrs.ngDragCloneGroup || null;
+                var _copyClass = (attrs.ngDragCloneCopyClass === "false" || attrs.ngDragCloneCopyClass === false)? false : true;
+                var _copyHtml = (attrs.ngDragCloneCopyHtml === "false" || attrs.ngDragDCloneCopyHtml === false)? false : true;
+                var _hideOnClone = (attrs.ngDragCloneHide === "false" || attrs.ngDragDCloneHide === false)? false : true;
+
+                var _didCopyHtml = false;
+                var _didCopyClass = false;
+                var _didHide = false;
+
+                var initialize = function () {
+                    _baseHTML = element.html();
+                    _baseClass = element.attr("class");
                     img = element.find('img');
                     element.attr('draggable', 'false');
                     img.attr('draggable', 'false');
@@ -477,6 +499,8 @@ angular.module("ngDraggable", [])
                     scope.$on('draggable:start', onDragStart);
                     scope.$on('draggable:move', onDragMove);
                     scope.$on('draggable:end', onDragEnd);
+                    scope.$on('droppable:dragenter', onDragEnterDrop);
+                    scope.$on('droppable:dragleave', onDragLeaveDrop);
                     preventContextMenu();
 
                 };
@@ -487,16 +511,40 @@ angular.module("ngDraggable", [])
                     img.on('mousedown touchstart touchmove touchend touchcancel', absorbEvent_);
                 };
                 var onDragStart = function(evt, obj, elm) {
-                    _allowClone=true;
+                    var dragCloneData = obj.dragCloneData;
+                    var toCloneGroup = dragCloneData.group;
+                    _allowClone = (toCloneGroup === null && _group === null) || toCloneGroup === _group;
                     if(angular.isDefined(obj.data.allowClone)){
                         _allowClone=obj.data.allowClone;
                     }
                     if(_allowClone) {
+                        var toCloneElm = angular.element(obj.element[0]);
+
+                        if(dragCloneData.copyHtml && _copyHtml)
+                        {
+                          element.html(toCloneElm.html());
+                          _didCopyHtml = true;
+                        }
+
+                        if(dragCloneData.copyClass && _copyClass)
+                        {
+                          element.addClass(toCloneElm.attr("class"));
+                          _didCopyClass = true;
+                        }
+
+                        element.addClass(dragCloneData.addClass);
+                        scope.clonedGroup = toCloneGroup;
                         scope.$apply(function () {
                             scope.clonedData = obj.data;
                         });
                         element.css('width', obj.element[0].offsetWidth);
                         element.css('height', obj.element[0].offsetHeight);
+
+                        if (_hideOnClone && dragCloneData.hideOnClone)
+                        {
+                          toCloneElm.css("visibility", "hidden");
+                          _didHide = true;
+                        }
 
                         moveElement(obj.tx, obj.ty);
                     }
@@ -514,11 +562,27 @@ angular.module("ngDraggable", [])
                 var onDragEnd = function(evt, obj) {
                     //moveElement(obj.tx,obj.ty);
                     if(_allowClone) {
-                        reset();
+                        reset(obj);
                     }
                 };
 
-                var reset = function() {
+                var onDragEnterDrop = function(evt, args)
+                {
+                  element.addClass("drag-over");
+                }
+
+                var onDragLeaveDrop = function(evt, args)
+                {
+                  element.removeClass("drag-over");
+                }
+
+                var reset = function(obj) {
+                    if(_didCopyHtml)
+                      element.html(_baseHTML);
+                    if(_didCopyClass)
+                      element.attr("class", _baseClass);
+                    if(_didHide)
+                      angular.element(obj.element[0]).css("visibility", "");
                     element.css({left:0,top:0, position:'fixed', 'z-index':-1, visibility:'hidden'});
                 };
                 var moveElement = function(x,y) {

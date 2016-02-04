@@ -15,17 +15,19 @@
         -ms-user-select: none;
         user-select: none;
     }
-    [ng-drag]{
+    .redbox{
         width: 100px;
         height: 100px;
-        background: rgba(255,0,0, 0.5);
+        background: rgb(250,10,10);
         color:white;
         text-align: center;
         padding-top:40px;
         display: inline-block;
-        margin::0px 10px;
         cursor: move;
+        margin-right: 10px;
+        margin-bottom: 10px;
     }
+
     ul.draggable-objects:after{
         display: block;
         content:"";
@@ -39,18 +41,38 @@
     }
 
     .draggable-objects li{
+        list-style: none;
         float:left;
-        display: block;
-        width: 120px;
-        height:100px;
-        margin-bottom: 10px;
     }
-    [ng-drag].drag-over{
+
+    .redbox.special
+    {
+      width: 200px;
+      background-color: #00FF00;
+    }
+
+    .redbox.special.dragging
+    {
+        padding-top: 5px;
+    }
+
+    .redbox.drag-over{
         border:solid 1px red;
     }
-    [ng-drag].dragging{
-        opacity: 0.5;
+    .redbox.dragging{
+        opacity: 0.7;
     }
+
+    .redbox.dragging.drag-over
+    {
+      opacity: 1;
+    }
+
+    [ng-drop] .redbox
+    {
+      display: inline-block;
+    }
+
     [ng-drop]{
         background: rgba(0,255,0, 0.5);
         text-align: center;
@@ -104,7 +126,9 @@
       <div class="space"></div>
         <ul class="draggable-objects">
             <li  ng-repeat="obj in draggableObjects" >
-                <div ng-drag="true" ng-drag-data="obj" data-allow-transform="true" ng-drag-scroll="true" scroll-element=".draggable-zones-container"> {{obj.name}} </div>
+                <div class="redbox {{obj.group}}" ng-drag-clone-group="{{obj.group}}" ng-drag-clone-copy-class="true" ng-drag-clone-add-class="test" ng-drag="true"  ng-drag-clone-group="{{obj.group}}" ng-drag-data="obj" data-allow-transform="true" ng-drag-scroll="true" scroll-element=".draggable-zones-container">
+                   {{obj.name}}
+                 </div>
             </li>
         </ul>
 
@@ -112,8 +136,7 @@
       <div class="draggable-zones-container">
             <div ng-drop="true" ng-drop-success="onDropComplete1($data,$event)">
                 <span class="title">Drop area #1</span>
-
-                <div ng-repeat="obj in droppedObjects1" ng-drag="true" ng-drag-data="obj" ng-drag-success="onDragSuccess1($data,$event)" ng-center-anchor="{{centerAnchor}}">
+                <div ng-repeat="obj in droppedObjects1" class="redbox {{obj.group}}" ng-drag="true" ng-drag-data="obj" ng-drag-success="onDragSuccess1($data,$event)"  ng-drag-clone-group="{{obj.group}}"  ng-drag-scroll="true" scroll-element=".draggable-zones-container">
                     {{obj.name}}
                 </div>
 
@@ -122,7 +145,7 @@
             <div ng-drop="true" ng-drop-success="onDropComplete2($data,$event)">
                 <span class="title">Drop area #2</span>
 
-                <div ng-repeat="obj in droppedObjects2" ng-drag="true" ng-drag-data="obj" ng-drag-success="onDragSuccess2($data,$event)" ng-center-anchor="{{centerAnchor}}">
+                <div ng-repeat="obj in droppedObjects2" class="redbox {{obj.group}}" ng-drag="true" ng-drag-data="obj" ng-drag-success="onDragSuccess2($data,$event)"  ng-drag-clone-group="{{obj.group}}"  ng-drag-scroll="true" scroll-element=".draggable-zones-container">
                     {{obj.name}}
                 </div>
 
@@ -130,7 +153,7 @@
             <div ng-drop="true" ng-drop-success="onDropComplete3($data,$event)">
                 <span class="title">Drop area #3</span>
 
-                <div ng-repeat="obj in droppedObjects3" ng-drag="true" ng-drag-data="obj" ng-drag-success="onDragSuccess3($data,$event)" ng-center-anchor="{{centerAnchor}}">
+                <div ng-repeat="obj in droppedObjects3" class="redbox {{obj.group}}" ng-drag="true" ng-drag-data="obj" ng-drag-success="onDragSuccess3($data,$event)"  ng-drag-clone-group="{{obj.group}}"  ng-drag-scroll="true" scroll-element=".draggable-zones-container">
                     {{obj.name}}
                 </div>
 
@@ -139,7 +162,7 @@
             <div ng-drop="true" ng-drop-success="onDropComplete4($data,$event)">
                 <span class="title">Drop area #4</span>
 
-                <div ng-repeat="obj in droppedObjects4" ng-drag="true" ng-drag-data="obj" ng-drag-success="onDragSuccess4($data,$event)" ng-center-anchor="{{centerAnchor}}">
+                <div ng-repeat="obj in droppedObjects4" class="redbox {{obj.group}}" ng-drag="true" ng-drag-data="obj" ng-drag-success="onDragSuccess4($data,$event)"  ng-drag-clone-group="{{obj.group}}"  ng-drag-scroll="true" scroll-element=".draggable-zones-container">
                     {{obj.name}}
                 </div>
 
@@ -147,7 +170,14 @@
       </div>
       <hr>
 
+      <div ng-drag-clone="" >
+          {{clonedData.name}}
+      </div>
 
+      <div ng-drag-clone="" ng-drag-clone-copy-class="true" ng-drag-clone-copy-html="false" ng-drag-clone-group="special">
+          <p>Mommy always said I'm special !</p>
+          {{clonedData.name}}
+      </div>
 
       </div>
       <footer style="margin-top:2000px;">footer</footer>
@@ -160,7 +190,7 @@
       controller('MainCtrl', function ($scope) {
         $scope.centerAnchor = true;
         $scope.toggleCenterAnchor = function () {$scope.centerAnchor = !$scope.centerAnchor}
-        $scope.draggableObjects = [{name:'one'}, {name:'two'}, {name:'three'}, {name:'four'}, {name: 'five'}, {name:'six'}, {name:'seven'}, {name:'eight'}, {name:'nine'}, {name:'ten'}, {name:'eleven'}, {name:'twelve'}, {name:'thirtheen'}, {name:'fourteen'}, {name:'fifteen'}, {name:'sixteen'}, {name:'seventeen'}, {name:'eighteen'}, {name:'nineteen'}, {name:'twenty'}];
+        $scope.draggableObjects = [{name:'one'}, {name:'two'}, {name:'three', group : "special"}, {name:'four'}, {name: 'five'}, {name:'six'}, {name:'seven'}, {name:'eight'}, {name:'nine'}, {name:'ten'}, {name:'eleven'}, {name:'twelve'}, {name:'thirtheen'}, {name:'fourteen'}, {name:'fifteen'}, {name:'sixteen'}, {name:'seventeen'}, {name:'eighteen'}, {name:'nineteen'}, {name:'twenty'}];
         $scope.droppedObjects1 = [];
         $scope.droppedObjects2= [];
         $scope.droppedObjects3= [];
