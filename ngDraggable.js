@@ -3,6 +3,69 @@
  * https://github.com/fatlinesofcode/ngDraggable
  */
 angular.module("ngDraggable", [])
+    .factory("ngDragHitTest", function($document, $window){
+
+
+        var sidesHitTests = {
+          "top" : function(bounds, mouseX, mouseY, distance)
+          {
+                return  mouseY < bounds.top + distance;
+          },
+          "bottom" : function(bounds, mouseX, mouseY, distance)
+          {
+                return mouseY > bounds.bottom - distance;
+          },
+          "left" : function(bounds, mouseX, mouseY, distance)
+          {
+                return mouseX < bounds.left + distance;
+          },
+          "right" : function(bounds, mouseX, mouseY, distance)
+          {
+                return mouseX > bounds.right - distance;
+          }
+        };
+
+        var pointBoxCollision = function(bounds, mouseX, mouseY)
+        {
+          return  mouseX >= bounds.left
+              && mouseX <= bounds.right
+              && mouseY <= bounds.bottom
+              && mouseY >= bounds.top;
+        }
+
+        var hitTest = function(element, mouseX, mouseY, sides) {
+            var distance = distance || 0;
+            if(sides && sides.hasOwnProperty("all") && sides["all"] !== null)
+            {
+                var distance = sides.all.distance || 10;
+                sides = {
+                "left"    : {"distance" : distance},
+                "right"   : {"distance" : distance},
+                "bottom"  : {"distance" : distance},
+                "top"     : {"distance" : distance}
+                };
+            }
+
+            var bounds = element.getBoundingClientRect();// ngDraggable.getPrivOffset(element);
+            mouseX -= $document[0].body.scrollLeft + $document[0].documentElement.scrollLeft;
+            mouseY -= $document[0].body.scrollTop + $document[0].documentElement.scrollTop;
+
+            var isInside = pointBoxCollision(bounds, mouseX, mouseY);
+            var result = {"inside" : false};
+            if(isInside)
+            {
+              result.inside = true;
+              for(var side_key in sides)
+              {
+                var distance = sides[side_key].distance || 10;
+                result[side_key] = sidesHitTests[side_key](bounds, mouseX, mouseY, distance);
+              }
+              return result;
+            }
+            return result;
+        };
+        return hitTest;
+    })
     .service('ngDraggable', [function() {
 
 
@@ -19,7 +82,7 @@ angular.module("ngDraggable", [])
         };
 
     }])
-    .directive('ngDrag', ['$rootScope', '$parse', '$document', '$window', 'ngDraggable', function ($rootScope, $parse, $document, $window, ngDraggable) {
+    .directive('ngDrag', ['$rootScope', '$parse', '$document', '$window', 'ngDraggable', 'ngDragHitTest', function ($rootScope, $parse, $document, $window, ngDraggable, ngDragHitTest) {
         return {
             restrict: 'A',
             link: function (scope, element, attrs) {
@@ -262,7 +325,7 @@ angular.module("ngDraggable", [])
         };
     }])
 
-    .directive('ngDrop', ['$parse', '$timeout', '$window', '$document', 'ngDraggable', function ($parse, $timeout, $window, $document, ngDraggable) {
+    .directive('ngDrop', ['$parse', '$timeout', '$window', '$document', 'ngDraggable', 'ngDragHitTest', function ($parse, $timeout, $window, $document, ngDraggable, ngDragHitTest) {
         return {
             restrict: 'A',
             link: function (scope, element, attrs) {
@@ -355,7 +418,7 @@ angular.module("ngDraggable", [])
                 };
 
                 var isTouching = function(mouseX, mouseY, dragElement) {
-                    var touching= hitTest(mouseX, mouseY);
+                    var touching= ngDragHitTest(element[0], mouseX, mouseY).inside;
                     scope.isTouching = touching;
                     if(touching){
                         _lastDropTouch = element;
@@ -521,19 +584,28 @@ angular.module("ngDraggable", [])
             }
         };
     }])
-    .directive('ngDragScroll', ['$window', '$interval', '$timeout', '$document', '$rootScope', function($window, $interval, $timeout, $document, $rootScope) {
+    .directive('ngDragScroll', ['$window', '$interval', '$timeout', '$document', '$rootScope', 'ngDragHitTest', function($window, $interval, $timeout, $document, $rootScope, ngDragHitTest) {
         return {
             restrict: 'A',
             link: function(scope, element, attrs) {
                 var intervalPromise = null;
                 var lastMouseEvent = null;
+                var lastDragObj = null;
 
                 var config = {
                     verticalScroll: attrs.verticalScroll || true,
                     horizontalScroll: attrs.horizontalScroll || true,
                     activationDistance: attrs.activationDistance || 75,
-                    scrollDistance: attrs.scrollDistance || 15
+                    scrollDistance: attrs.scrollDistance || 15,
+                    scrollelement: null //It's the window itself :)
                 };
+
+                if (attrs.scrollElement)
+                {
+                  var foundElement = angular.element( document.querySelector( attrs.scrollElement ) );
+                  if (foundElement && foundElement.length > 0)
+                    config.scrollElements = foundElement;
+                }
 
 
                 var reqAnimFrame = (function() {
@@ -546,6 +618,7 @@ angular.module("ngDraggable", [])
                             window.setTimeout(callback, 1000 / 60);
                         };
                 })();
+
 
                 var animationIsOn = false;
                 var createInterval = function() {
@@ -566,78 +639,119 @@ angular.module("ngDraggable", [])
                     nextFrame(function() {
                         if (!lastMouseEvent) return;
 
-                        var viewportWidth = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
-                        var viewportHeight = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+                        // lastMouseEvent.clientX is undefined when dealing with a touch device, resulting in
+                        // no scrolling when dragging an item to the bottom of the screen
+                        // Seen on Chrome 47.0.2526.111
+                        var clientX = lastMouseEvent.clientX;
+                        if (angular.isUndefined(lastMouseEvent.clientX))
+                          clientX = lastMouseEvent.touches[0].clientX;
 
-                        var scrollX = 0;
-                        var scrollY = 0;
+                        // lastMouseEvent.clientY is undefined when dealing with a touch device, resulting in
+                        // no scrolling when dragging an item to the bottom of the screen
+                        // Seen on Chrome 47.0.2526.111
+                        var clientY = lastMouseEvent.clientY;
+                        if (angular.isUndefined(lastMouseEvent.clientY))
+                          clientY = lastMouseEvent.touches[0].clientY;
 
-                        if (config.horizontalScroll) {
-                            // If horizontal scrolling is active.
-
-                            // lastMouseEvent.clientX is undefined when dealing with a touch device, resulting in
-                            // no scrolling when dragging an item to the bottom of the screen
-                            // Seen on Chrome 47.0.2526.111
-                            var clientX = lastMouseEvent.clientX;
-                            if (angular.isUndefined(lastMouseEvent.clientX))
-                              clientX = lastMouseEvent.touches[0].clientX;
-
-                            if (clientX < config.activationDistance) {
-                                // If the mouse is on the left of the viewport within the activation distance.
-                                scrollX = -config.scrollDistance;
+                        var hoverElements = ["window"]; //Later, create a variable to check if the user want to scroll the window or not.
+                        if(config.scrollElements)
+                        {
+                          var sides = {
+                            "all"    : {"distance" : config.activationDistance}
+                          };
+                          angular.forEach(config.scrollElements, function(testElement){ //Generate the hittest for each element
+                            var dragHitTestResult = ngDragHitTest(testElement, lastDragObj.x, lastDragObj.y, sides);
+                            if(dragHitTestResult.inside)
+                            {
+                              hoverElements.push({"element" : testElement, "hitTestResult" : dragHitTestResult});
                             }
-                            else if (clientX > viewportWidth - config.activationDistance) {
-                                // If the mouse is on the right of the viewport within the activation distance.
-                                scrollX = config.scrollDistance;
-                            }
+                          });
                         }
 
-                        if (config.verticalScroll) {
-                            // If vertical scrolling is active.
+                        var moved = false;
+                        angular.forEach(hoverElements, function(hoverElem)
+                        {
+                            var isWindow = (hoverElem === "window");
+                            var scrollX = 0;
+                            var scrollY = 0;
 
-                            // lastMouseEvent.clientY is undefined when dealing with a touch device, resulting in
-                            // no scrolling when dragging an item to the bottom of the screen
-                            // Seen on Chrome 47.0.2526.111
-                            var clientY = lastMouseEvent.clientY;
-                            if (angular.isUndefined(lastMouseEvent.clientY))
-                              clientY = lastMouseEvent.touches[0].clientY;
-
-                            if (clientY < config.activationDistance) {
-                                // If the mouse is on the top of the viewport within the activation distance.
-                                scrollY = -config.scrollDistance;
+                            if (config.horizontalScroll) {
+                                if(isWindow)
+                                {
+                                  // If horizontal scrolling is active.
+                                  var scrollXEnd = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+                                  if (clientX < config.activationDistance) // If the mouse is on the left of the viewport within the activation distance.
+                                      scrollX = -config.scrollDistance;
+                                  else if (clientX > scrollXEnd - config.activationDistance)// If the mouse is on the right of the viewport within the activation distance.
+                                      scrollX = config.scrollDistance;
+                                }
+                                else if (hoverElem.hitTestResult.right) //It's an element and it's on its right edge
+                                {
+                                    scrollX = config.scrollDistance;
+                                }
+                                else if(hoverElem.hitTestResult.left) //It's an element and it's on its left edge
+                                {
+                                    scrollX = -config.scrollDistance;
+                                }
                             }
-                            else if (clientY > viewportHeight - config.activationDistance) {
-                                // If the mouse is on the bottom of the viewport within the activation distance.
-                                scrollY = config.scrollDistance;
+
+                            if (config.verticalScroll) {
+                                if (isWindow)
+                                {
+                                  var scrollYEnd = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+                                  // If vertical scrolling is active.
+                                  if (clientY < config.activationDistance) {
+                                      // If the mouse is on the top of the viewport within the activation distance.
+                                      scrollY = -config.scrollDistance;
+                                  }
+                                  else if (clientY > scrollYEnd - config.activationDistance) {
+                                      // If the mouse is on the bottom of the viewport within the activation distance.
+                                      scrollY = config.scrollDistance;
+                                  }
+                                }
+                                else if (hoverElem.hitTestResult.top) //It's an element and it's on its right edge
+                                {
+                                    scrollY = -config.scrollDistance;
+                                }
+                                else if(hoverElem.hitTestResult.bottom) //It's an element and it's on its left edge
+                                {
+                                    scrollY = config.scrollDistance;
+                                }
                             }
-                        }
 
+                            if (scrollX !== 0 || scrollY !== 0) {
+                                moved = true;
 
+                                // Remove the transformation from the element, scroll the window by the scroll distance
+                               // record how far we scrolled, then reapply the element transformation.
+                               var elementTransform = element.css('transform');
+                               element.css('transform', 'initial');
 
-                        if (scrollX !== 0 || scrollY !== 0) {
-                            // Record the current scroll position.
-                            var currentScrollLeft = ($window.pageXOffset || $document[0].documentElement.scrollLeft);
-                            var currentScrollTop = ($window.pageYOffset || $document[0].documentElement.scrollTop);
+                                if(isWindow){
+                                  $window.scrollBy(scrollX, scrollY);
+                                  // Record the current scroll position.
+                                  var currentScrollLeft = ($window.pageXOffset || $document[0].documentElement.scrollLeft);
+                                  var currentScrollTop = ($window.pageYOffset || $document[0].documentElement.scrollTop);
 
-                            // Remove the transformation from the element, scroll the window by the scroll distance
-                            // record how far we scrolled, then reapply the element transformation.
-                            var elementTransform = element.css('transform');
-                            element.css('transform', 'initial');
+                                  var horizontalScrollAmount = ($window.pageXOffset || $document[0].documentElement.scrollLeft) - currentScrollLeft;
+                                  var verticalScrollAmount =  ($window.pageYOffset || $document[0].documentElement.scrollTop) - currentScrollTop;
 
-                            $window.scrollBy(scrollX, scrollY);
+                                  lastMouseEvent.pageX += horizontalScrollAmount;
+                                  lastMouseEvent.pageY += verticalScrollAmount;
+                                }
+                                else {
+                                  var elementToMove = angular.element(hoverElem.element);
+                                  elementToMove[0].scrollTop = elementToMove[0].scrollTop + scrollY;
+                                  elementToMove[0].scrollLeft = elementToMove[0].scrollLeft + scrollX;
+                                }
+                                //reaply the element transfrom
+                                element.css('transform', elementTransform);
+                            }
+                        });//End angular forEach
 
-                            var horizontalScrollAmount = ($window.pageXOffset || $document[0].documentElement.scrollLeft) - currentScrollLeft;
-                            var verticalScrollAmount =  ($window.pageYOffset || $document[0].documentElement.scrollTop) - currentScrollTop;
-
-                            element.css('transform', elementTransform);
-
-                            lastMouseEvent.pageX += horizontalScrollAmount;
-                            lastMouseEvent.pageY += verticalScrollAmount;
-
-                            $rootScope.$emit('draggable:_triggerHandlerMove', lastMouseEvent);
-                        }
-
-                    });
+                        if (moved)
+                          $rootScope.$emit('draggable:_triggerHandlerMove', lastMouseEvent);
+                    }); //End nextFrame
                 };
 
                 var clearInterval = function() {
@@ -663,6 +777,7 @@ angular.module("ngDraggable", [])
                     if (obj.element[0] !== element[0]) return;
 
                     lastMouseEvent = obj.event;
+                    lastDragObj = obj;
                 });
             }
         };
