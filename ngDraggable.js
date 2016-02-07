@@ -350,6 +350,8 @@ angular.module("ngDraggable", [])
                 var onDragStartCallback = $parse(attrs.ngDragStart);
                 var onDragStopCallback = $parse(attrs.ngDragStop);
                 var onDragMoveCallback = $parse(attrs.ngDragMove);
+                var onDragEnterCallback = $parse(attrs.ngDragEnter);
+                var onDragLeaveCallback = $parse(attrs.ngDragLeave);
 
                 var initialize = function () {
                     toggleListeners(true);
@@ -383,16 +385,45 @@ angular.module("ngDraggable", [])
                         });
                     }
                 };
+
                 var onDragMove = function(evt, obj) {
                     if(! _dropEnabled)return;
-                    isTouching(obj.x,obj.y,obj.element);
 
+                    var dragElement = obj.element;
+                    var cbData = {
+                      "drag_data" : obj,
+                      "drop" : element
+                    }
+                    var enterCb = function()
+                    {
+                      $rootScope.$broadcast('droppable:dragenter', {element : element, dragElement : dragElement});
+                      if(attrs.ngDragEnter)
+                      {
+                        scope.$apply(function () {
+                            onDragEnterCallback(scope, {$data : cbData,  $event : obj.event});
+                        });
+                      }
+                    }
+
+                    var leaveCb = function()
+                    {
+                      $rootScope.$broadcast('droppable:dragleave', {element : element, dragElement : dragElement});
+                      if(attrs.ngDragLeave)
+                      {
+                        scope.$apply(function () {
+                            onDragLeaveCallback(scope, {$data : cbData, $event : obj.event});
+                        });
+                      }
+                    }
+
+                    isTouching(obj.x,obj.y,obj.element, enterCb, leaveCb);
                     if (attrs.ngDragMove) {
                         $timeout(function(){
                             onDragMoveCallback(scope, {$data: obj.data, $event: obj});
                         });
                     }
                 };
+
 
                 var onDragEnd = function (evt, obj) {
 
@@ -402,6 +433,7 @@ angular.module("ngDraggable", [])
                         updateDragStyles(false, obj.element);
                         return;
                     }
+
                     if (isTouching(obj.x, obj.y, obj.element)) {
                         // call the ngDraggable ngDragSuccess element callback
                         if(obj.callback){
@@ -424,32 +456,30 @@ angular.module("ngDraggable", [])
                     updateDragStyles(false, obj.element);
                 };
 
-                var isTouching = function(mouseX, mouseY, dragElement) {
+                var isTouching = function(mouseX, mouseY, dragElement, enterCb, leaveCb) {
                     var touching= hitTest(mouseX, mouseY);
                     scope.isTouching = touching;
                     if(touching){
                         _lastDropTouch = element;
                     }
-                    updateDragStyles(touching, dragElement);
+                    updateDragStyles(touching, dragElement, enterCb, leaveCb);
                     return touching;
                 };
 
-                var updateDragStyles = function(touching, dragElement) {
+                var updateDragStyles = function(touching, dragElement, enterCb, leaveCb) {
                     if(touching){
                         var justEntered = !element.hasClass('drag-enter');
                         element.addClass('drag-enter');
                         dragElement.addClass('drag-over');
-                        if(justEntered)
-                        {
-                          $rootScope.$broadcast('droppable:dragenter', {element:element, dragElement:dragElement});
-                        }
+                        if(justEntered && enterCb)
+                          enterCb();
                     }else if(_lastDropTouch == element){
                         _lastDropTouch=null;
                         var justLeaved = element.hasClass('drag-enter');
                         element.removeClass('drag-enter');
                         dragElement.removeClass('drag-over');
-                        if(justLeaved)
-                          $rootScope.$broadcast('droppable:dragleave', {element:element, dragElement:dragElement});
+                        if(justLeaved && leaveCb)
+                          leaveCb();
                     }
                 };
 
@@ -475,13 +505,20 @@ angular.module("ngDraggable", [])
                 var _copyClass = (attrs.ngDragCloneCopyClass === "false" || attrs.ngDragCloneCopyClass === false)? false : true;
                 var _copyHtml = (attrs.ngDragCloneCopyHtml === "false" || attrs.ngDragDCloneCopyHtml === false)? false : true;
                 var _hideOnClone = (attrs.ngDragCloneHide === "false" || attrs.ngDragDCloneHide === false)? false : true;
+                var _copyHtmlElement = element;
+                if (_copyHtml && attrs.ngDragCloneCopyHtml !== "true" || attrs.ngDragCloneCopyHtml !== true)
+                {
+                  var foundElement = angular.element(element[0].querySelector(".clone_container"));
+                  if (foundElement && foundElement.length > 0)
+                    _copyHtmlElement = foundElement;
+                }
 
                 var _didCopyHtml = false;
                 var _didCopyClass = false;
                 var _didHide = false;
 
                 var initialize = function () {
-                    _baseHTML = element.html();
+                    _baseHTML = _copyHtmlElement.html();
                     _baseClass = element.attr("class");
                     img = element.find('img');
                     element.attr('draggable', 'false');
@@ -522,7 +559,7 @@ angular.module("ngDraggable", [])
 
                         if(dragCloneData.copyHtml && _copyHtml)
                         {
-                          element.html(toCloneElm.html());
+                          _copyHtmlElement.html(toCloneElm.html());
                           _didCopyHtml = true;
                         }
 
@@ -578,7 +615,9 @@ angular.module("ngDraggable", [])
 
                 var reset = function(obj) {
                     if(_didCopyHtml)
-                      element.html(_baseHTML);
+                    {
+                      _copyHtmlElement.html(_baseHTML);
+                    }
                     if(_didCopyClass)
                       element.attr("class", _baseClass);
                     if(_didHide)

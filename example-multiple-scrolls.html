@@ -134,7 +134,7 @@
 
       <hr/>
       <div class="draggable-zones-container">
-            <div ng-drop="true" ng-drop-success="onDropComplete1($data,$event)">
+            <div ng-drop="true" ng-drop-success="onDropComplete1($data,$event)" ng-drag-enter="onDragEnter1($data, $event)" ng-drag-leave="onDragLeave1($data, $event)">
                 <span class="title">Drop area #1</span>
                 <div ng-repeat="obj in droppedObjects1" class="redbox {{obj.group}}" ng-drag="true" ng-drag-data="obj" ng-drag-success="onDragSuccess1($data,$event)"  ng-drag-clone-group="{{obj.group}}"  ng-drag-scroll="true" scroll-element=".draggable-zones-container">
                     {{obj.name}}
@@ -170,8 +170,14 @@
       </div>
       <hr>
 
-      <div ng-drag-clone="" >
-          {{clonedData.name}}
+      <div ng-drag-clone="" ng-drag-clone-copy-html=".clone_container">
+          <p class="clone_container">
+            {{clonedData.name}}
+          </p>
+      </div>
+
+      <div class="clone_container bis">
+
       </div>
 
       <div ng-drag-clone="" ng-drag-clone-copy-class="true" ng-drag-clone-copy-html="false" ng-drag-clone-group="special">
@@ -207,6 +213,15 @@
                 $scope.droppedObjects1.splice(index, 1);
             }
         }
+
+        $scope.onDragEnter1=function($data, $event){
+            console.log("onDragEnter1", $data, $event);
+        }
+
+        $scope.onDragLeave1=function(drop,drag){
+            console.log("onDragLeave1", drop, drag);
+        }
+
         $scope.onDragSuccess2=function(data,evt){
             var index = $scope.droppedObjects2.indexOf(data);
             if (index > -1) {
