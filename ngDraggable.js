@@ -108,6 +108,8 @@ angular.module("ngDraggable", [])
                 var onDragStopCallback = $parse(attrs.ngDragStop) || null;
                 var onDragSuccessCallback = $parse(attrs.ngDragSuccess) || null;
                 var allowTransform = angular.isDefined(attrs.allowTransform) ? scope.$eval(attrs.allowTransform) : true;
+                var doFollowMouse = (attrs.ngDragFollow === "false" || attrs.ngDragFollow === false)? false : true;
+
 
                 var getDragData = $parse(attrs.ngDragData);
                 var dragCloneData = {
@@ -115,7 +117,7 @@ angular.module("ngDraggable", [])
                   copyHtml : (attrs.ngDragDCloneCopyHtml === "false" || attrs.ngDragDCloneCopyHtml === false)? false : true,
                   copyClass : (attrs.ngDragCloneCopyClass === "false" || attrs.ngDragCloneCopyClass === false)? false : true,
                   addClass : attrs.ngDragCloneAddClass || null,
-                  hideOnClone :attrs.ngDragCloneHide || true
+                  hideOnClone : (attrs.ngDragCloneHide === "false" || attrs.ngDragCloneHide === false)? false : true
                 };
 
                 // deregistration function for mouse move events in $rootScope triggered by jqLite trigger handler
@@ -316,6 +318,9 @@ angular.module("ngDraggable", [])
                 };
 
                 var moveElement = function (x, y) {
+                    if(!doFollowMouse)
+                      return;
+
                     if(allowTransform) {
                         element.css({
                             transform: 'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, ' + x + ', ' + y + ', 0, 1)',
