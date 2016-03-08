@@ -284,7 +284,6 @@ angular.module("ngDraggable", [])
                     if (!_dragEnabled)
                         return;
                     evt.preventDefault();
-                    $rootScope.$broadcast('draggable:end', {x:_mx, y:_my, tx:_tx, ty:_ty, event:evt, element:element, data:_data, callback:onDragComplete, uid: _myid, dragCloneData : dragCloneData});
                     element.removeClass('dragging');
                     element.parent().find('.drag-enter').removeClass('drag-enter');
                     reset();
@@ -296,6 +295,8 @@ angular.module("ngDraggable", [])
                             onDragStopCallback(scope, {$data: _data, $event: evt});
                         });
                     }
+
+                    $rootScope.$broadcast('draggable:end', {x:_mx, y:_my, tx:_tx, ty:_ty, event:evt, element:element, data:_data, callback:onDragComplete, uid: _myid, dragCloneData : dragCloneData});
 
                     _deregisterRootMoveListener();
                 };
@@ -446,16 +447,12 @@ angular.module("ngDraggable", [])
                         }
 
                         if (attrs.ngDropSuccess) {
-                            $timeout(function(){
-                                onDropCallback(scope, {$data: obj.data, $event: obj, $target: scope.$eval(scope.value)});
-                            });
+                            onDropCallback(scope, {$data: obj.data, $event: obj, $target: scope.$eval(scope.value)});
                         }
                     }
 
                     if (attrs.ngDragStop) {
-                        $timeout(function(){
-                            onDragStopCallback(scope, {$data: obj.data, $event: obj});
-                        });
+                        onDragStopCallback(scope, {$data: obj.data, $event: obj});
                     }
 
                     updateDragStyles(false, obj.element);
