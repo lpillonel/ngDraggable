@@ -20,13 +20,13 @@ var _isClickableElement = function (event) {
     );
 };
 
+var _dragData = null;
+
 angular.module("ngDraggable", [])
     .directive('ngDrag', ['$rootScope', '$parse', '$document', '$window', '$templateRequest', '$compile', function ($rootScope, $parse, $document, $window, $templateRequest, $compile) {
         return {
             restrict: 'A',
             link: function (scope, element, attrs) {
-
-                scope.value = attrs.ngDrag;
 
                 var onDragStartCallback = $parse(attrs.ngDragStart) || null;
                 var onDragStopCallback = $parse(attrs.ngDragStop) || null;
@@ -157,7 +157,7 @@ angular.module("ngDraggable", [])
 
                     if (!element.hasClass('dragging')) {
                         element.addClass('dragging');
-                        scope.data = _data = getDragData(scope);
+                        _dragData = scope.dragData = _data = getDragData(scope);
 
                         $rootScope.$broadcast('draggable:start', {x:_mx, y:_my, tx:_tx, ty:_ty, event:evt, element:element, data:_data});
                         onDragStartCallback && onDragStartCallback(scope, {$data: _data, $event: evt});
@@ -214,6 +214,7 @@ angular.module("ngDraggable", [])
                 };
 
                 var onrelease = function(evt) {
+                    _dragData = scope.dragData = null;
                     evt.preventDefault();
                     if (_dragEnabled && element.hasClass('dragging')) {
                         $rootScope.$broadcast('draggable:end', {x:_mx, y:_my, tx:_tx, ty:_ty, event:evt, element:element, data:_data, callback:onDragComplete, uid: _myid});
@@ -272,7 +273,6 @@ angular.module("ngDraggable", [])
         return {
             restrict: 'A',
             link: function (scope, element, attrs) {
-                scope.value = attrs.ngDrop;
                 scope.isTouching = false;
 
                 var _lastDropTouch=null;
@@ -295,10 +295,9 @@ angular.module("ngDraggable", [])
                     // remove listeners
 
                     if (!enable)return;
-                    // add listeners.
-                    scope.$watch(attrs.ngDrop, onEnableChange);
+
                     scope.$on('$destroy', onDestroy);
-                    //scope.$on('draggable:start', onDragStart);
+                    scope.$on('draggable:start', onDragStart);
                     scope.$on('draggable:move', onDragMove);
                     scope.$on('draggable:end', onDragEnd);
                 };
@@ -306,14 +305,10 @@ angular.module("ngDraggable", [])
                 var onDestroy = function (enable) {
                     toggleListeners(false);
                 };
-                var onEnableChange = function (newVal, oldVal) {
-                    _dropEnabled=newVal;
+                var onDragStart = function(evt, obj) {
+                    // Compute _dropEnabled
+                    _dropEnabled = $parse(attrs.ngDrop)(scope, {$data : _dragData});
                 };
-                // var onDragStart = function(evt, obj) {
-                //     if(! _dropEnabled)return;
-                //     isTouching(obj.x,obj.y,obj.element);
-                //     onDragStartCallback && onDragStartCallback(scope, {$data: obj.data, $event: obj});
-                // };
                 var onDragMove = function(evt, obj) {
                     if( ! _dropEnabled) return;
 
@@ -334,7 +329,7 @@ angular.module("ngDraggable", [])
                     if (isTouching(obj.x, obj.y, obj.element)) {
                         // call the ngDraggable ngDragSuccess element callback
                         obj.callback && obj.callback(obj);
-                        onDropCallback && onDropCallback(scope, {$data: obj.data, $event: obj, $target: scope.$eval(scope.value)});
+                        onDropCallback && onDropCallback(scope, {$data: obj.data, $event: obj});
                     }
 
                     updateDragStyles(false, obj.element);
