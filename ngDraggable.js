@@ -182,8 +182,8 @@ angular.module("ngDraggable", [])
                                     position : 'fixed',
                                     top      : 0,
                                     left     : 0,
-                                    width    : `${offset.width}px`,
-                                    height   : `${offset.height}px`,
+                                    width    : offset.width+'px',
+                                    height   : offset.height+'px',
                                     'z-index': 99999,
                                 });
                             }
