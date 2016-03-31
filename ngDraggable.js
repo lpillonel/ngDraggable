@@ -28,14 +28,15 @@ angular.module("ngDraggable", [])
             restrict: 'A',
             link: function (scope, element, attrs) {
 
-                var onDragStartCallback = $parse(attrs.ngDragStart) || null;
-                var onDragStopCallback = $parse(attrs.ngDragStop) || null;
+                var onDragStartCallback   = $parse(attrs.ngDragStart) || null;
+                var onDragStopCallback    = $parse(attrs.ngDragStop) || null;
                 var onDragSuccessCallback = $parse(attrs.ngDragSuccess) || null;
-                var getDragData = $parse(attrs.ngDragData);
-                var clone = scope.$eval(attrs.ngDragClone);
-                var cloneTemplate = angular.isString(clone) ? clone : null;
+                var getDragData           = $parse(attrs.ngDragData);
+                var clone                 = scope.$eval(attrs.ngDragClone);
+                var cloneTemplate         = angular.isString(clone) ? clone : null;
+                var snapping              = attrs.ngDragSnap || 10;
 
-
+                // Get clone template and compile to dom node
                 if (cloneTemplate) {
                     $templateRequest(cloneTemplate).then(function(template){
                         cloneTemplate = $compile(template)(scope);
@@ -59,13 +60,13 @@ angular.module("ngDraggable", [])
                 // to identify the element in order to prevent getting superflous events when a single element has both drag and drop directives on it.
                 var _myid = scope.$id;
                 var _data = null;
-
+                var _dragging = false;
                 var _dragOffset = null;
-
+                var _dragOffset = null;
+                var _dragOffset = null;
+                var _dragOffset = null;
                 var _dragEnabled = false;
-
                 var _pressTimer = null;
-
 
 
                 // deregistration function for mouse move events in $rootScope triggered by jqLite trigger handler
@@ -128,7 +129,9 @@ angular.module("ngDraggable", [])
 
                     offset = element[0].getBoundingClientRect();
                     _dragOffset = offset;
-
+                    _dragOffset = offset;
+                    _dragOffset = offset;
+                    _dragOffset = offset;
 
                     element.centerX = element[0].offsetWidth / 2;
                     element.centerY = element[0].offsetHeight / 2;
@@ -142,6 +145,7 @@ angular.module("ngDraggable", [])
 
                     $document.on(_moveEvents, onmove);
                     $document.on(_releaseEvents, onrelease);
+
                     // This event is used to receive manually triggered mouse move events
                     // jqLite unfortunately only supports triggerHandler(...)
                     // See http://api.jquery.com/triggerHandler/
@@ -152,6 +156,15 @@ angular.module("ngDraggable", [])
                 };
 
                 var onmove = function (evt) {
+                    // Check delta to determine a on drag
+                    var delta = Math.round(Math.sqrt(Math.pow(Math.abs(_inputEvent(evt).pageX - _mx),2)+Math.pow(Math.abs(_inputEvent(evt).pageY - _my), 2)));
+                    if (_dragging || delta > snapping) {
+                        _dragging = true;
+                        ondrag(evt);
+                    }
+                };
+
+                var ondrag = function(evt){
                     if (!_dragEnabled)return;
                     evt.preventDefault();
 
@@ -215,6 +228,7 @@ angular.module("ngDraggable", [])
 
                 var onrelease = function(evt) {
                     _dragData = scope.dragData = null;
+                    _dragging = false;
                     evt.preventDefault();
                     if (_dragEnabled && element.hasClass('dragging')) {
                         $rootScope.$broadcast('draggable:end', {x:_mx, y:_my, tx:_tx, ty:_ty, event:evt, element:element, data:_data, callback:onDragComplete, uid: _myid});
