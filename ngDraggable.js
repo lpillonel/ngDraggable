@@ -20,7 +20,19 @@ var _isClickableElement = function (event) {
     );
 };
 
+var _findFirstParentElement = function(el, attribute) {
+    let parent = el;
+
+    while (parent) {
+        if(parent.hasAttribute(attribute)) return parent;
+        parent = parent.parentElement;
+    }
+
+    return null;
+};
+
 var _dragData = null;
+var _touchedDropElement;
 
 angular.module("ngDraggable", [])
     .directive('ngDrag', ['$rootScope', '$parse', '$document', '$window', '$templateRequest', '$compile', function ($rootScope, $parse, $document, $window, $templateRequest, $compile) {
@@ -44,7 +56,6 @@ angular.module("ngDraggable", [])
                 }
 
                 var offset,
-                    _cloneNode,
                     _mx,
                     _my,
                     _tx,
@@ -56,6 +67,7 @@ angular.module("ngDraggable", [])
                 var _moveEvents = 'touchmove mousemove';
                 var _releaseEvents = 'touchend mouseup';
                 var _dragHandle;
+                var _cloneNode;
 
                 // to identify the element in order to prevent getting superflous events when a single element has both drag and drop directives on it.
                 var _myid = scope.$id;
@@ -221,6 +233,11 @@ angular.module("ngDraggable", [])
                         _ty = Math.round(_my - cloneOffset.height / 2);
                     }
 
+                    // Find drop element under mouse
+                    _cloneNode[0].style.display = 'none';
+                    _touchedDropElement = _findFirstParentElement(document.elementFromPoint(_mx, _my), 'ng-drop');
+                    _cloneNode[0].style.display = 'block';
+
                     moveElement(_tx, _ty);
 
                     $rootScope.$broadcast('draggable:move', { x: _mx, y: _my, tx: _tx, ty: _ty, event: evt, element: element, data: _data, uid: _myid, dragOffset: _dragOffset });
@@ -326,7 +343,7 @@ angular.module("ngDraggable", [])
                 var onDragMove = function(evt, obj) {
                     if( ! _dropEnabled) return;
 
-                    if (isTouching(obj.x,obj.y,obj.element)) {
+                    if (isTouching()) {
                         // Move callback
                         onDragMoveCallback && onDragMoveCallback(scope, {$data: obj.data, $event: obj});
                     }
@@ -340,7 +357,7 @@ angular.module("ngDraggable", [])
                         updateDragStyles(false, obj.element);
                         return;
                     }
-                    if (isTouching(obj.x, obj.y, obj.element)) {
+                    if (isTouching()) {
                         // call the ngDraggable ngDragSuccess element callback
                         obj.callback && obj.callback(obj);
                         onDropCallback && onDropCallback(scope, {$data: obj.data, $event: obj});
@@ -351,35 +368,23 @@ angular.module("ngDraggable", [])
                     onDragStopCallback && onDragStopCallback(scope, {$data: obj.data, $event: obj});
                 };
 
-                var isTouching = function(mouseX, mouseY, dragElement) {
-                    var touching= hitTest(mouseX, mouseY);
-                    scope.isTouching = touching;
+                var isTouching = function() {
+                    var touching = scope.isTouching = (element[0] === _touchedDropElement);
+
                     if(touching){
                         _lastDropTouch = element;
                     }
-                    updateDragStyles(touching, dragElement);
+                    updateDragStyles(touching);
                     return touching;
                 };
 
-                var updateDragStyles = function(touching, dragElement) {
+                var updateDragStyles = function(touching) {
                     if(touching){
                         element.addClass('drag-enter');
-                        dragElement.addClass('drag-over');
-                    }else if(_lastDropTouch == element){
+                    } else if(_lastDropTouch == element) {
                         _lastDropTouch=null;
                         element.removeClass('drag-enter');
-                        dragElement.removeClass('drag-over');
                     }
-                };
-
-                var hitTest = function(x, y) {
-                    var bounds = element[0].getBoundingClientRect();// ngDraggable.getPrivOffset(element);
-                    x -= $document[0].body.scrollLeft + $document[0].documentElement.scrollLeft;
-                    y -= $document[0].body.scrollTop + $document[0].documentElement.scrollTop;
-                    return  x >= bounds.left
-                        && x <= bounds.right
-                        && y <= bounds.bottom
-                        && y >= bounds.top;
                 };
 
                 initialize();
