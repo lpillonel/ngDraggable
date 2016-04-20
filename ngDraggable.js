@@ -21,7 +21,7 @@ var _isClickableElement = function (event) {
 };
 
 var _findFirstParentElement = function(el, attribute) {
-    let parent = el;
+    var parent = el;
 
     while (parent) {
         if(parent.hasAttribute(attribute)) return parent;
