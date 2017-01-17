@@ -167,12 +167,14 @@ angular.module("ngDraggable", [])
                     });
                 };
 
+                var raf
                 var onmove = function (evt) {
                     // Check delta to determine a on drag
                     var delta = Math.round(Math.sqrt(Math.pow(Math.abs(_inputEvent(evt).pageX - _mx),2)+Math.pow(Math.abs(_inputEvent(evt).pageY - _my), 2)));
                     if (_dragging || delta > snapping) {
                         _dragging = true;
-                        ondrag(evt);
+                        raf && window.cancelAnimationFrame(raf);
+                        raf = window.requestAnimationFrame(ondrag.bind(this, evt));
                     }
                 };
 
