@@ -277,7 +277,7 @@ angular.module("ngDraggable", [])
 
                 var reset = function() {
                     element.css({transform:'', 'z-index':''});
-
+                    raf && window.cancelAnimationFrame(raf);
                     if (clone && _cloneNode) {
                         document.body.removeChild(_cloneNode[0]);
                         _cloneNode = null;
