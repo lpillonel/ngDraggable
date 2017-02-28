@@ -137,7 +137,7 @@ angular.module("ngDraggable", [])
 
                 var onlongpress = function(evt) {
                     if(! _dragEnabled)return;
-                    // evt.preventDefault();
+                    evt.preventDefault();
 
                     offset = element[0].getBoundingClientRect();
                     _dragOffset = offset;
