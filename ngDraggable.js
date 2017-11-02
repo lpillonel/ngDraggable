@@ -63,9 +63,9 @@ angular.module("ngDraggable", [])
                     _mrx,
                     _mry;
                 var _hasTouch = ('ontouchstart' in window) || window.DocumentTouch && document instanceof DocumentTouch;
-                var _pressEvents = 'touchstart mousedown';
-                var _moveEvents = 'touchmove mousemove';
-                var _releaseEvents = 'touchend mouseup';
+                var _pressEvents = _hasTouch ? 'touchstart' : 'mousedown';
+                var _moveEvents = _hasTouch ? 'touchmove' : 'mousemove';
+                var _releaseEvents = _hasTouch ? 'touchend' : 'mouseup';
                 var _dragHandle;
                 var _cloneNode;
 
@@ -121,7 +121,8 @@ angular.module("ngDraggable", [])
                         _pressTimer = setTimeout(function(){
                             cancelPress();
                             onlongpress(evt);
-                        },100);
+                            ondrag(evt);
+                        }, 1000);
                         $document.on(_moveEvents, cancelPress);
                         $document.on(_releaseEvents, cancelPress);
                     } else {
@@ -174,7 +175,7 @@ angular.module("ngDraggable", [])
                     if (_dragging || delta > snapping) {
                         _dragging = true;
                         raf && window.cancelAnimationFrame(raf);
-                        raf = window.requestAnimationFrame(ondrag.bind(this, evt));
+                        raf = window.requestAnimationFrame(ondrag.bind(null, evt));
                     }
                 };
 
@@ -220,17 +221,14 @@ angular.module("ngDraggable", [])
                         }
                     }
 
-                    if (clone) {
-                        var cloneOffset = _cloneNode[0].getBoundingClientRect();
-                    }
-
-                    _mx = _inputEvent(evt).pageX;//ngDraggable.getEventProp(evt, 'pageX');
-                    _my = _inputEvent(evt).pageY;//ngDraggable.getEventProp(evt, 'pageY');
+                    _mx = _inputEvent(evt).clientX;//ngDraggable.getEventProp(evt, 'pageX');
+                    _my = _inputEvent(evt).clientY;//ngDraggable.getEventProp(evt, 'pageY');
 
                     if ( ! clone) {
                         _tx = _mx - _mrx - _dragOffset.left;
                         _ty = _my - _mry - _dragOffset.top;
                     } else {
+                        var cloneOffset = _cloneNode[0].getBoundingClientRect();
                         _tx = Math.round(_mx - cloneOffset.width / 2);
                         _ty = Math.round(_my - cloneOffset.height / 2);
                     }
