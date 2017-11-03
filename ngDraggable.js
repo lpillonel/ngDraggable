@@ -44,15 +44,21 @@ angular.module("ngDraggable", [])
                 var onDragStopCallback    = $parse(attrs.ngDragStop) || null;
                 var onDragSuccessCallback = $parse(attrs.ngDragSuccess) || null;
                 var getDragData           = $parse(attrs.ngDragData);
+                var touchDelay            = $parse(attrs.ngDragTouchDelay)(scope);
                 var clone                 = scope.$eval(attrs.ngDragClone);
                 var cloneTemplate         = angular.isString(clone) ? clone : null;
                 var snapping              = attrs.ngDragSnap || 10;
-
+                
                 // Get clone template and compile to dom node
                 if (cloneTemplate) {
                     $templateRequest(cloneTemplate).then(function(template){
                         cloneTemplate = $compile(template)(scope);
                     });
+                }
+                
+                // Sanitize touchDelay
+                if(touchDelay === undefined) {
+                  touchDelay = 1000;
                 }
 
                 var offset,
@@ -122,7 +128,7 @@ angular.module("ngDraggable", [])
                             cancelPress();
                             onlongpress(evt);
                             ondrag(evt);
-                        }, 1000);
+                        }, touchDelay);
                         $document.on(_moveEvents, cancelPress);
                         $document.on(_releaseEvents, cancelPress);
                     } else {
@@ -170,6 +176,7 @@ angular.module("ngDraggable", [])
 
                 var raf
                 var onmove = function (evt) {
+                  evt.preventDefault();
                     // Check delta to determine a on drag
                     var delta = Math.round(Math.sqrt(Math.pow(Math.abs(_inputEvent(evt).pageX - _mx),2)+Math.pow(Math.abs(_inputEvent(evt).pageY - _my), 2)));
                     if (_dragging || delta > snapping) {
@@ -181,7 +188,6 @@ angular.module("ngDraggable", [])
 
                 var ondrag = function(evt){
                     if (!_dragEnabled)return;
-                    evt.preventDefault();
 
                     if (!element.hasClass('dragging')) {
                         element.addClass('dragging');
